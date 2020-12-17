@@ -1,0 +1,29 @@
+# IntelliJ
+.idea*
+*.iml
+
+# VS Code
+.bsp
+.metals
+.vscode
+.bloop
+
+# Mac
+.DS_Store
+
+# SBT
+project/project
+target/
+*.log
+
+# Local run & build
+/spark-warehouse/
+application.local.conf
+output/
+secrets
+
+# Local testing helm
+helm/Chart.yaml
+helm/values.yaml
+/helm-vars
+metrics

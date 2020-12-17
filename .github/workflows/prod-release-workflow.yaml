@@ -1,0 +1,204 @@
+name: 'Automatic: Deploy to PROD'
+
+on:
+  pull_request:
+    types: [ closed ]
+
+jobs:
+  prepare-release:
+    name: Release to Prod
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.project.outputs.modules }}
+      version: ${{ steps.vars.outputs.version }}
+
+    # If merged & pr was tagged release & from a release branch
+    if: contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.merged == true && (github.event.pull_request.head.ref == 'release' || github.event.pull_request.head.ref == 'hotfix')
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Java and Scala
+        uses: olafurpg/setup-scala@v10
+
+      - name: Cache sbt
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+          key: ${{ runner.os }}-sbt-cache-v2-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}
+
+      - name: SBT Resolve
+        shell: bash
+        run: make version
+
+      - name: Set variables
+        id: vars
+        run: echo ::set-output name=version::$(make version)
+
+      - name: Set Project Modules for matrix
+        id: project
+        shell: bash
+        run: echo ::set-output name=modules::$(make list-modules-json)
+
+      - name: Slack on error
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          text: ":x: The workflow `${{ github.workflow }}` triggered by `${{ github.event_name }}` failed\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|See Log>"
+          status: ${{ job.status }}
+          fields: repo,message,commit,workflow
+        if: ${{ failure() }}
+
+
+  build-deploy:
+    name: Build & Deploy to PROD
+    runs-on: ubuntu-latest
+    needs: prepare-release
+    strategy:
+      matrix:
+        modules: ${{fromJson(needs.prepare-release.outputs.modules)}}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Java and Scala
+        uses: olafurpg/setup-scala@v10
+
+      - name: Cache sbt
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+          key: ${{ runner.os }}-sbt-cache-v2-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}
+
+      - name: Azure Container Registry Login
+        shell: bash
+        run: make acr-docker-push-login
+        env:
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+
+      - name: Dockerize
+        shell: bash
+        run: make docker-build ${{ matrix.modules }}
+
+      - name: Publish Docker Image to Github Container Registry
+        shell: bash
+        env:
+          MODULE: ${{ matrix.modules }}
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+        run: make docker-push-acr $MODULE
+
+      - name: Install Helm
+        shell: bash
+        run: make install-helm
+
+      - name: Github Container Registry Helm Login
+        shell: bash
+        run: make acr-helm-push-login
+        env:
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+
+      - name: Append Environmental Values to Chart Values
+        shell: bash
+        env:
+          ENVIRONMENT: prod
+        run: make helm-concat ${{ matrix.modules }}
+
+      - name: Push Charts to Github Repo
+        shell: bash
+        env:
+          ENVIRONMENT: prod
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+        run: make helm-push-acr ${{ matrix.modules }}
+
+      - name: Slack on error
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          text: ":x: The workflow `${{ github.workflow }} (${{ matrix.modules }})` triggered by `${{ github.event_name }}` failed\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|See Log>"
+          status: ${{ job.status }}
+          fields: repo,message,commit,workflow
+        if: ${{ failure() }}
+
+  success:
+    needs: [ prepare-release, build-deploy ]
+    name: Notify success
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{  needs.prepare-release.outputs.version }}
+          release_name: Release ${{  needs.prepare-release.outputs.version }}
+          draft: false
+          prerelease: false
+
+      - name: Deploy notification
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          status: ${{ job.status }}
+          fields:
+          text: ":rocket: ${{ github.event.repository.name }} *v${{ needs.prepare-release.outputs.version }}* deployed to *PROD*\n\n:arrow_right: <https://github.com/${{ github.repository }}/releases/tag/v${{  needs.prepare-release.outputs.version }}|Check Release>"
+
+      - name: Delete current release/hotfix branch
+        uses: dawidd6/action-delete-branch@v3
+        continue-on-error: true
+        with:
+          github_token: ${{github.token}}
+          branches: ${{ github.event.pull_request.head.ref}}
+
+  abandon-release:
+    name: Abandon Release to Prod
+    runs-on: ubuntu-latest
+
+    # If PR was closed, but not merged
+    if: contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.merged == false && github.event.pull_request.head.ref == 'release'
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Delete tag
+        shell: bash
+        run: |
+          TAG=$(git describe --exact-match ${{ github.event.pull_request.head.sha }})
+          echo $TAG
+          git tag -d $TAG
+          git push --delete origin $TAG
+          git push -v origin :refs/tags/$TAG
+

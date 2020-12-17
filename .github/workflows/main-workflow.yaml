@@ -1,0 +1,232 @@
+name: 'Automatic: On Push'
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'hotfix'
+      - 'main'
+
+jobs:
+  check:
+    name: Prebuild checks
+    runs-on: ubuntu-latest
+    outputs:
+      num_changes: ${{ steps.check1.outputs.num_changes }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Check changes
+        id: check1
+        shell: bash
+        env:
+          SHA_OLD: ${{ github.event.before }}
+          SHA_NEW: ${{ github.sha }}
+        run: |
+          echo ::set-output name=num_changes::$(make check-changes)
+
+      - name: Turnstyle (1 at the time)
+        uses: softprops/turnstyle@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: check
+    if: needs.check.outputs.num_changes > 0
+    outputs:
+      modules: ${{ steps.project.outputs.modules }}
+      version: ${{ steps.vars.outputs.version }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java and Scala
+        uses: olafurpg/setup-scala@v10
+
+      - name: Cache sbt
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+          key: ${{ runner.os }}-sbt-cache-v2-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}
+
+      - name: Lint
+        shell: bash
+        run: make lint
+
+      - name: Test
+        shell: bash
+        run: make test-coverage
+
+      - name: Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: target
+
+      - name: Set Project Modules for matrix
+        id: project
+        shell: bash
+        run: echo ::set-output name=modules::$(make list-modules-json)
+
+      - name: Bump snapshot (main)
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: make bump-snapshot-and-push
+
+      - name: Set variables
+        id: vars
+        run: echo ::set-output name=version::$(make version)
+
+      - name: Show Output
+        shell: bash
+        run: |
+          echo "modules: ${{ steps.project.outputs.modules }}"
+          echo "version: ${{ steps.vars.outputs.version }}"
+          echo "num_changes: ${{ needs.check.outputs.num_changes }}"
+
+      - name: Slack on error
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          text: ":x: The workflow `${{ github.workflow }}` triggered by `${{ github.event_name }}` failed\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|See Log>"
+          status: ${{ job.status }}
+          fields: repo,message,commit,workflow
+        if: ${{ failure() }}
+
+
+  notify:
+    if: github.ref == 'refs/heads/hotfix'
+    needs: build
+    name: Notify hotfix
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Hotfix notification
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          status: ${{ job.status }}
+          fields:
+          text: ":eight_pointed_black_star: ${{ github.event.repository.name }} *hotfix* ready for release\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions?query=workflow%3Arelease|Start Release Workflow ( hotfix ) >"
+
+  deploy:
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    name: Build & Deploy Snapshot
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        modules: ${{fromJson(needs.build.outputs.modules)}}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Java and Scala
+        uses: olafurpg/setup-scala@v10
+
+      - name: Cache sbt
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+          key: ${{ runner.os }}-sbt-cache-v2-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}
+
+      - name: Azure Container Registry Login
+        shell: bash
+        run: make acr-docker-push-login
+        env:
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+
+      - name: Dockerize
+        shell: bash
+        run: make docker-build ${{ matrix.modules }}
+
+      - name: Publish Docker Image to Github Container Registry
+        shell: bash
+        env:
+          MODULE: ${{ matrix.modules }}
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+        run: make docker-push-acr $MODULE
+
+      - name: Install Helm
+        shell: bash
+        run: make install-helm
+
+      - name: Github Container Registry Helm Login
+        shell: bash
+        run: make acr-helm-push-login
+        env:
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+
+      - name: Append Environmental Values to Chart Values
+        shell: bash
+        env:
+          ENVIRONMENT: dev
+        run: make helm-concat ${{ matrix.modules }}
+
+      - name: Push Charts to Github Helm Repo
+        shell: bash
+        env:
+          ENVIRONMENT: dev
+          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
+          APP_SPN: ${{ secrets.APP_SPN }}
+        run: make helm-push-acr ${{ matrix.modules }}
+
+      - name: Slack on error
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          text: ":x: The workflow `${{ github.workflow }} (${{ matrix.modules }})`  triggered by `${{ github.event_name }}` failed\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|See Log>"
+          status: ${{ job.status }}
+          fields: repo,message,commit,workflow
+        if: ${{ failure() }}
+
+  success:
+    needs: [ build,deploy ]
+    name: Notify success
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy notification
+        uses: 8398a7/action-slack@v3
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          username: 'github actions'
+          author_name: ''
+          icon_emoji: ':github:'
+          status: ${{ job.status }}
+          fields:
+          text: ":rocket: ${{ github.event.repository.name }} *v${{ needs.build.outputs.version }}* deployed to *DEV*\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions?query=workflow%3A\"Manual%3A+Start+Release\"|Start Release Workflow (main)>"
+
