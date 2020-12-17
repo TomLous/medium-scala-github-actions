@@ -2,7 +2,7 @@
 # Environment variables that need to be set in the Github Secrets settings 
 
 # CODECOV_TOKEN for upload-codecov target
-# APP_SPN & APP_SPN_PWD credentials for Github Container Registry for pushing & pulling images
+# REGISTRY_USERNAME & REGISTRY_PASSWORD credentials for Github Container Registry for pushing & pulling images
 # SLACK_WEBHOOK_URL for slack integration
 
 #########################################
@@ -17,7 +17,7 @@
 # Hardcoded values
 
 # The remote registry for Docker containers
-CONTAINER_REGISTRY := ???
+CONTAINER_REGISTRY := docker.pkg.github.com
 
 # Helm version
 HELM_VERSION := v3.4.1
@@ -39,6 +39,9 @@ VERSION = $(eval VERSION := $$(shell sbt --error 'set showSuccess := false' show
 
 # Allow to pass the module name as command line arg
 MODULE = $(shell arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}})
+
+# Feature name
+FEATURE = $(shell echo $(MODULE) | sed -e 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' )
 
 # Available modules to build
 MODULES = $(shell sbt --error 'set showSuccess := false' listModules)
@@ -65,9 +68,9 @@ endef
 list-modules list-modules-json test-coverage upload-codecov \
 set-github-config git-push check-changes create-hotfix-branch \
 bump-snapshot bump-release bump-patch bump-snapshot-and-push bump-release-and-push bump-patch-and-push \
-docker-build docker-push-acr docker-image-clean docker-images-clean docker-images-purge docker-push-minikube \
-install-helm helm-concat helm-combine helm-push-acr helm-push-acr helm-minikube-deploy \
-acr-docker-push-login acr-helm-push-login acr-helm-push-login acr-list-charts acr-list-images acr-repository-tags \
+docker-build docker-push-registry docker-image-clean docker-images-clean docker-images-purge docker-push-minikube \
+install-helm helm-concat helm-combine helm-push-registry helm-push-registry helm-minikube-deploy \
+registry-docker-push-login registry-helm-push-login registry-helm-push-login registry-list-charts registry-list-images registry-repository-tags \
 minikube-setup minikube-delete minikube-mount minikube-add-secret
 
 .DEFAULT_GOAL := list-modules
@@ -115,6 +118,12 @@ create-hotfix-branch:
 	git branch -d hotfix || true
 	git checkout -b hotfix $$(git describe --tags --abbrev=0 | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$$")
 
+create-feature-branch:
+	@git checkout main && git fetch && git pull
+	git checkout -b feature/$(FEATURE)
+
+
+
 # SBT Version bumping
 bump-snapshot:
 	sbt bumpSnapshot
@@ -133,7 +142,7 @@ bump-patch-and-push: set-github-config bump-patch git-push
 docker-build:
 	$(call check_module) sbt $(MODULE)/docker
 
-docker-push-acr:
+docker-push-registry:
 	$(call check_module)
 	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(IMAGE_NAME):$(VERSION)
 	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(IMAGE_NAME):latest
@@ -178,8 +187,8 @@ helm-concat: guard-ENVIRONMENT
 	@$(call check_module)
 	cat $(MODULE)/helm-vars/values-workhorse-$(ENVIRONMENT).yaml >> helm/values.yaml
 
-helm-push-acr: export HELM_EXPERIMENTAL_OCI=1
-helm-push-acr: guard-ENVIRONMENT guard-CONTAINER_REGISTRY
+helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
+helm-push-registry: guard-ENVIRONMENT guard-CONTAINER_REGISTRY
 	@$(call check_module)
 	sed "s/imageRegistry:.*/imageRegistry: $(CONTAINER_REGISTRY)/" -i helm/values.yaml
 	cat helm/Chart.yaml
@@ -195,21 +204,21 @@ helm-minikube-deploy:
 
 
 # Github Container Registry Commands
-acr-docker-push-login: guard-APP_SPN_PWD guard-CONTAINER_REGISTRY guard-APP_SPN
-	@echo $(APP_SPN_PWD) | docker login $(CONTAINER_REGISTRY) --username $(APP_SPN) --password-stdin
+registry-docker-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME
+	@echo $(REGISTRY_PASSWORD) | docker login $(CONTAINER_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
 
-acr-helm-push-login: export HELM_EXPERIMENTAL_OCI=1
-acr-helm-push-login: guard-APP_SPN_PWD guard-CONTAINER_REGISTRY guard-APP_SPN
-	@echo $(APP_SPN_PWD) | helm registry login $(CONTAINER_REGISTRY) --username $(APP_SPN) --password-stdin
+registry-helm-push-login: export HELM_EXPERIMENTAL_OCI=1
+registry-helm-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME
+	@echo $(REGISTRY_PASSWORD) | helm registry login $(CONTAINER_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
 
-acr-list-charts: guard-APP_SPN_PWD guard-CONTAINER_REGISTRY guard-APP_SPN guard-TEAM_NAME
-	@curl -s -u $(APP_SPN):$(APP_SPN_PWD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(TEAM_NAME)/charts/"))'
+registry-list-charts: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-TEAM_NAME
+	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(TEAM_NAME)/charts/"))'
 
-acr-list-images: guard-APP_SPN_PWD guard-CONTAINER_REGISTRY guard-APP_SPN guard-TEAM_NAME
-	@curl -s -u $(APP_SPN):$(APP_SPN_PWD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(TEAM_NAME)/")  and (contains("/charts/") | not))'
+registry-list-images: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-TEAM_NAME
+	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(TEAM_NAME)/")  and (contains("/charts/") | not))'
 
-acr-repository-tags: guard-APP_SPN_PWD guard-CONTAINER_REGISTRY guard-APP_SPN guard-ENV_REPOSITORY
-	curl -s -u $(APP_SPN):$(APP_SPN_PWD) -X GET https://$(CONTAINER_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'
+registry-repository-tags: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-ENV_REPOSITORY
+	curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'
 
 
 # Minikube commands
@@ -231,7 +240,7 @@ minikube-setup:
 	helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
  	helm repo add incubator https://charts.helm.sh/incubator
 	helm repo update
-	helm install spark incubator/sparkoperator --namespace spark-operator --set enableWebhook=true,sparkJobNamespace=spark-apps,logLevel=3
+	helm install spark incubator/sparkoperator --namespace spark-operator --set enableWebhook=true,sparkJobNamespace=spark-apps,logLevel=3 --skip-crds
 	helm repo add chartmuseum http://$$(minikube ip):8080
 	@echo "Check Cluster"
 	kubectl cluster-info
