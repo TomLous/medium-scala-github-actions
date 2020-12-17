@@ -77,7 +77,9 @@ jobs:
       - name: Set Project Modules for matrix
         id: project
         shell: bash
-        run: echo ::set-output name=modules::$(make list-modules-json)
+        run: |
+          make list-modules-json
+          echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Bump snapshot (main)
         if: github.ref == 'refs/heads/main'
@@ -86,7 +88,10 @@ jobs:
 
       - name: Set variables
         id: vars
-        run: echo ::set-output name=version::$(make version)
+        run: |
+          make version
+          echo ::set-output name=version::$(make version)
+
 
       - name: Show Output
         shell: bash
