@@ -78,6 +78,8 @@ jobs:
         id: project
         shell: bash
         run: |
+          sbt listModules
+          make list-modules
           make list-modules-json
           echo ::set-output name=modules::$(make list-modules-json)
 

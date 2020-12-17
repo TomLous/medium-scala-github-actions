@@ -143,8 +143,7 @@ lazy val commonSettings = Seq(
 
 lazy val testSettings = Seq(
   Test / testOptions += Tests.Argument("-oDT"),
-  Test / parallelExecution := false,
-  Test / coverageEnabled := true
+  Test / parallelExecution := false
 )
 
 lazy val assemblySettings = Seq(
