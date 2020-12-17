@@ -86,24 +86,24 @@ jobs:
             ~/.ivy2/cache
           key: ${{ runner.os }}-sbt-cache-v2-${{ hashFiles('**/*.sbt') }}-${{ hashFiles('project/build.properties') }}
 
-      - name: Azure Container Registry Login
+      - name: Container Registry Login
         shell: bash
-        run: make acr-docker-push-login
+        run: make registry-docker-push-login
         env:
-          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
-          APP_SPN: ${{ secrets.APP_SPN }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USERNAME: ${{ github.actor }}
 
       - name: Dockerize
         shell: bash
-        run: make docker-build ${{ matrix.modules }}
+        run: make docker-build ${{ matrix.module }}
 
       - name: Publish Docker Image to Github Container Registry
         shell: bash
         env:
-          MODULE: ${{ matrix.modules }}
-          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
-          APP_SPN: ${{ secrets.APP_SPN }}
-        run: make docker-push-acr $MODULE
+          MODULE: ${{ matrix.module }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+        run: make docker-push-registry $MODULE
 
       - name: Install Helm
         shell: bash
@@ -111,24 +111,24 @@ jobs:
 
       - name: Github Container Registry Helm Login
         shell: bash
-        run: make acr-helm-push-login
+        run: make registry-helm-push-login
         env:
-          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
-          APP_SPN: ${{ secrets.APP_SPN }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USERNAME: ${{ github.actor }}
 
       - name: Append Environmental Values to Chart Values
         shell: bash
         env:
           ENVIRONMENT: prod
-        run: make helm-concat ${{ matrix.modules }}
+        run: make helm-concat ${{ matrix.module }}
 
       - name: Push Charts to Github Repo
         shell: bash
         env:
           ENVIRONMENT: prod
-          APP_SPN_PWD: ${{ secrets.APP_SPN_PWD }}
-          APP_SPN: ${{ secrets.APP_SPN }}
-        run: make helm-push-acr ${{ matrix.modules }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USERNAME: ${{ github.actor }}
+        run: make helm-push-registry ${{ matrix.module }}
 
       - name: Slack on error
         uses: 8398a7/action-slack@v3
@@ -138,7 +138,7 @@ jobs:
           username: 'github actions'
           author_name: ''
           icon_emoji: ':github:'
-          text: ":x: The workflow `${{ github.workflow }} (${{ matrix.modules }})` triggered by `${{ github.event_name }}` failed\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|See Log>"
+          text: ":x: The workflow `${{ github.workflow }} (${{ matrix.module }})` triggered by `${{ github.event_name }}` failed\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|See Log>"
           status: ${{ job.status }}
           fields: repo,message,commit,workflow
         if: ${{ failure() }}

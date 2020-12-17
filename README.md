@@ -130,20 +130,20 @@ Sets up a link between local docker and minikube registry (port 5000). Tags the 
 #### helm-minikube-deploy [module]
 Installs / upgrades a SparkApplication helm deployment for the current module in `spark-apps` namespace in minikube based on the settings in `/[module]/helm-vars/values-minikube.yaml` 
 
-#### acr-docker-push-login
-Needs `APP_SPN_PWD`, `APP_SPN` and `CONTAINER_REGISTRY` (in Makefile) and logs in into docker images registry
+#### registry-docker-push-login
+Needs `REGISTRY_PASSWORD`, `REGISTRY_USERNAME` and `CONTAINER_REGISTRY` (in Makefile) and logs in into docker images registry
 
-#### acr-helm-push-login
-Needs `APP_SPN_PWD`, `APP_SPN` and `CONTAINER_REGISTRY` (in Makefile) and logs in into helm chart repository
+#### registry-helm-push-login
+Needs `REGISTRY_PASSWORD`, `REGISTRY_USERNAME` and `CONTAINER_REGISTRY` (in Makefile) and logs in into helm chart repository
 
-#### acr-list-charts
-Needs `TEAM_NAME`, `APP_SPN_PWD`, `APP_SPN` and `CONTAINER_REGISTRY` (in Makefile) and lists all charts for current team in Github Container Registry
+#### registry-list-charts
+Needs `TEAM_NAME`, `REGISTRY_PASSWORD`, `REGISTRY_USERNAME` and `CONTAINER_REGISTRY` (in Makefile) and lists all charts for current team in Github Container Registry
 
-#### acr-list-images
-Needs `TEAM_NAME`, `APP_SPN_PWD`, `APP_SPN` and `CONTAINER_REGISTRY` (in Makefile) and lists all images for current team in Github Container Registry
+#### registry-list-images
+Needs `TEAM_NAME`, `REGISTRY_PASSWORD`, `REGISTRY_USERNAME` and `CONTAINER_REGISTRY` (in Makefile) and lists all images for current team in Github Container Registry
 
-#### acr-repository-tags
-Needs `ENV_REPOSITORY`, `APP_SPN_PWD`, `APP_SPN` and `CONTAINER_REGISTRY` (in Makefile) and lists all tags for current image/chart (`ENV_REPOSITORY`) in Github Container Registry
+#### registry-repository-tags
+Needs `ENV_REPOSITORY`, `REGISTRY_PASSWORD`, `REGISTRY_USERNAME` and `CONTAINER_REGISTRY` (in Makefile) and lists all tags for current image/chart (`ENV_REPOSITORY`) in Github Container Registry
 
 
 ### CI/CD only:
@@ -185,7 +185,7 @@ eg. `v1.2.0-[hash1]-SNAPSHOT` =>  `v1.2.1`, `v1.2.0` =>  `v1.2.1`, `v1.2.3` =>  
 #### bump-patch-and-push
 Runs `set-github-config`, `bump-patch` and `git-push` consecutively
 
-#### docker-push-acr [module]
+#### docker-push-registry [module]
 Pushes the locally created docker image `[team]/[module]:latest` to the `CONTAINER_REGISTRY` defined in the Makefile
 `[CONTAINER_REGISTRY]/[team]/[module]:[version]` and `[CONTAINER_REGISTRY]/[team]/[module]:latest` 
 
@@ -195,7 +195,7 @@ Installs helm and azure cli in CI/CD environment to be able to push to helm Gith
 #### helm-concat [module]
 Needs `ENVIRONMENT` as env variables and creates a single helm deployment in the `helm/` directory based on these env vars
 
-#### helm-push-acr [module]
+#### helm-push-registry [module]
 Needs `CONTAINER_REGISTRY` (from Makefile), `ENVIRONMENT` and `HELM_EXPERIMENTAL_OCI=1` as env var. Replaces the `imageRegistry` param in `values.yaml` to point to `CONTAINER_REGISTRY`
 Saves the charts and pushes them to the chart repo in `CONTAINER_REGISTRY` using `[CONTAINER_REGISTRY]/[team]/charts/[ENVIRONMENT]/[chart name from module]:latest` and `[CONTAINER_REGISTRY]/[team]/charts/[ENVIRONMENT]/[chart name from module]:[version]`
 
