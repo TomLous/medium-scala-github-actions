@@ -82,6 +82,9 @@ list-modules:
 list-modules-json:
 	@echo $(MODULES) |  jq -R -c 'split(" ")'
 
+echo-modules:
+	@echo "'$(MODULES)'"
+
 lint:
 	sbt scalastyle
 
