@@ -78,10 +78,16 @@ jobs:
         id: project
         shell: bash
         run: |
-          sbt listModules
+          sbt --error 'set showSuccess := false' listModules
+          echo "---"
           make list-modules
+          echo "---"
           make list-modules-json
+          echo "---"
           make echo-modules
+          echo "---"
+          sbt --error 'set showSuccess := false' listModules
+          echo "---"
           echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Bump snapshot (main)

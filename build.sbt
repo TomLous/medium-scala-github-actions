@@ -383,3 +383,5 @@ lazy val listModules = taskKey[Unit]("List buildable modules")
 
 // Logging
 ivyLoggingLevel in ThisBuild := UpdateLogging.Quiet
+logLevel in run := Level.Warn
+showSuccess := false
