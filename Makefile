@@ -44,7 +44,7 @@ MODULE = $(shell arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}})
 FEATURE = $(shell echo $(MODULE) | sed -e 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' )
 
 # Available modules to build
-MODULES = $(eval MODULES :=  $$(shell sbt --error 'set showSuccess := false' listModules))$(MODULES)
+MODULES = $(eval MODULES :=  $$(shell sbt --error 'set showSuccess := false' listModules | perl -pe 's/[^a-zA-Z \-]//g  and s/\s+/ /g and s/\s+$$$$//g'))$(MODULES)
 
 # Get the image namespace/repo
 IMAGE_NAME = $(eval IMAGE_NAME := $$(shell sbt --error 'set showSuccess := false' $(MODULE)/showImageName))$(IMAGE_NAME)
