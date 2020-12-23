@@ -81,6 +81,7 @@ jobs:
           sbt listModules
           make list-modules
           make list-modules-json
+          make echo-modules
           echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Bump snapshot (main)
