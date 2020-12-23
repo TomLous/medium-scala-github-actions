@@ -44,9 +44,7 @@ MODULE = $(shell arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}})
 FEATURE = $(shell echo $(MODULE) | sed -e 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' )
 
 # Available modules to build
-#MODULES = $(eval MODULES :=  $$(shell sbt --error 'set showSuccess := false' listModules))$(MODULES) #Weird bug adding some escape char to all output
-MODULES = "basic-example"
-
+MODULES = $(eval MODULES :=  $$(shell sbt --error 'set showSuccess := false' listModules))$(MODULES) #Weird bug adding some escape char to all output
 
 # Get the image namespace/repo
 IMAGE_NAME = $(eval IMAGE_NAME := $$(shell sbt --error 'set showSuccess := false' $(MODULE)/showImageName))$(IMAGE_NAME)
