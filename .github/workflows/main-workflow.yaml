@@ -175,6 +175,7 @@ jobs:
           MODULE: ${{ matrix.module }}
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_OWNER: ${{ github.repository_owner }}
         run: make docker-push-registry $MODULE
 
       - name: Install Helm
@@ -200,6 +201,7 @@ jobs:
           ENVIRONMENT: dev
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_OWNER: ${{ github.repository_owner }}
         run: make helm-push-registry ${{ matrix.module }}
 
       - name: Slack on error

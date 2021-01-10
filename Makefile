@@ -31,8 +31,8 @@ OUTPUT_PATH := ./output
 SHELL := /bin/bash
 
 # Name of the team, often also name of the image namespace
-TEAM_NAME = $(eval TEAM_NAME := $$(shell sbt --error 'set showSuccess := false' showTeam))$(TEAM_NAME)
-IMAGE_NAMESPACE = $(TEAM_NAME) 
+REPO_NAME = $(eval REPO_NAME := $$(shell sbt --error 'set showSuccess := false' showTeam))$(REPO_NAME)
+IMAGE_NAMESPACE = $(REPO_NAME)
 
 # The version of the current release
 VERSION = $(eval VERSION := $$(shell sbt --error 'set showSuccess := false' showVersion))$(VERSION)
@@ -145,12 +145,12 @@ bump-patch-and-push: set-github-config bump-patch git-push
 docker-build:
 	$(call check_module) sbt $(MODULE)/docker
 
-docker-push-registry:
+docker-push-registry: guard-REGISTRY_OWNER
 	$(call check_module)
-	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(IMAGE_NAME):$(VERSION)
-	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(IMAGE_NAME):latest
-	docker push $(CONTAINER_REGISTRY)/$(IMAGE_NAME):$(VERSION)
-	docker push $(CONTAINER_REGISTRY)/$(IMAGE_NAME):latest
+	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):$(VERSION)
+	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):latest
+	docker push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):$(VERSION)
+	docker push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):latest
 
 docker-image-clean:
 	@$(call check_module)
@@ -191,15 +191,15 @@ helm-concat: guard-ENVIRONMENT
 	cat $(MODULE)/helm-vars/values-workhorse-$(ENVIRONMENT).yaml >> helm/values.yaml
 
 helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
-helm-push-registry: guard-ENVIRONMENT guard-CONTAINER_REGISTRY
+helm-push-registry: guard-ENVIRONMENT guard-CONTAINER_REGISTRY guard-REGISTRY_OWNER
 	@$(call check_module)
 	sed "s/imageRegistry:.*/imageRegistry: $(CONTAINER_REGISTRY)/" -i helm/values.yaml
 	cat helm/Chart.yaml
 	cat helm/values.yaml
-	helm chart save helm $(CONTAINER_REGISTRY)/$(TEAM_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):$(VERSION)
-	helm chart save helm $(CONTAINER_REGISTRY)/$(TEAM_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):latest
-	helm chart push $(CONTAINER_REGISTRY)/$(TEAM_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):$(VERSION)
-	helm chart push $(CONTAINER_REGISTRY)/$(TEAM_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):latest
+	helm chart save helm $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):$(VERSION)
+	helm chart save helm $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):latest
+	helm chart push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):$(VERSION)
+	helm chart push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):latest
 
 helm-minikube-deploy:
 	@$(call check_module)
@@ -214,11 +214,11 @@ registry-helm-push-login: export HELM_EXPERIMENTAL_OCI=1
 registry-helm-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME
 	@echo $(REGISTRY_PASSWORD) | helm registry login $(CONTAINER_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
 
-registry-list-charts: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-TEAM_NAME
-	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(TEAM_NAME)/charts/"))'
+registry-list-charts: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
+	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/charts/"))'
 
-registry-list-images: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-TEAM_NAME
-	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(TEAM_NAME)/")  and (contains("/charts/") | not))'
+registry-list-images: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
+	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/")  and (contains("/charts/") | not))'
 
 registry-repository-tags: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-ENV_REPOSITORY
 	curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'

@@ -74,7 +74,7 @@ val externalDependencies = Seq.empty[ModuleID]
 /**
   * Project settings
   */
-val team = "ateam"
+val repo = `medium-scala-github-actions`.id
 val baseImage = s"gcr.io/spark-operator/spark:v3.0.0-hadoop3"
 val targetDockerJarPath = "/opt/spark/jars"
 val targetDockerWorkDirPath = "/opt/spark/work-dir"
@@ -185,8 +185,8 @@ lazy val scalafmtSettings = Seq(
 
 lazy val dockerSettings = Seq(
   imageNames in docker := Seq(
-    ImageName(s"$team/${name.value}:${version.value}"),
-    ImageName(s"$team/${name.value}:latest")
+    ImageName(s"$repo/${name.value}:${version.value}"),
+    ImageName(s"$repo/${name.value}:latest")
   ),
   buildOptions in docker := BuildOptions(
     cache = false,
@@ -286,10 +286,10 @@ def createProjectModule(
         }
       },
       getChartName := {
-        s"$team-$moduleName"
+        s"$repo-$moduleName"
       },
       getArtifactName := {
-        s"$team-$moduleName.jar"
+        s"$repo-$moduleName.jar"
       },
       showImageName := {
         println(getImageName.value.getOrElse(""))
@@ -366,9 +366,9 @@ showVersion := {
   println((version in ThisBuild).value)
 }
 
-lazy val showTeam = taskKey[Unit]("Show team")
-showTeam := {
-  println(team)
+lazy val showRepo = taskKey[Unit]("Show repo")
+showRepo := {
+  println(repo)
 }
 
 // Internal tasks
