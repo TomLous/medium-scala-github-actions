@@ -40,7 +40,7 @@ jobs:
     needs: check
     if: needs.check.outputs.num_changes > 0
     outputs:
-      module: ${{ steps.project.outputs.modules }}
+      modules: ${{ steps.project.outputs.modules }}
       version: ${{ steps.vars.outputs.version }}
 
     steps:
@@ -77,18 +77,7 @@ jobs:
       - name: Set Project Modules for matrix
         id: project
         shell: bash
-        run: |
-          sbt --error 'set showSuccess := false' listModules
-          echo "---"
-          make list-modules
-          echo "---"
-          make list-modules-json
-          echo "---"
-          make echo-modules
-          echo "---"
-          sbt --error 'set showSuccess := false' listModules
-          echo "---"
-          echo ::set-output name=modules::$(make list-modules-json)
+        run: echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Bump snapshot (main)
         if: github.ref == 'refs/heads/main'
