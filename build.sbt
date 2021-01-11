@@ -74,7 +74,7 @@ val externalDependencies = Seq.empty[ModuleID]
 /**
   * Project settings
   */
-val repo = `medium-scala-github-actions`.id
+val repo = `medium-scala-github-actions`.id.toLowerCase
 val baseImage = s"gcr.io/spark-operator/spark:v3.0.0-hadoop3"
 val targetDockerJarPath = "/opt/spark/jars"
 val targetDockerWorkDirPath = "/opt/spark/work-dir"
