@@ -190,8 +190,8 @@ jobs:
         shell: bash
         run: make registry-helm-push-login
         env:
-          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY_USERNAME: ${{ github.actor }}
+          CHART_PASSWORD: ${{ secrets.CHART_PASSWORD }}
+          CHART_USERNAME: ${{ github.actor }}
 
       - name: Append Environmental Values to Chart Values
         shell: bash
@@ -203,9 +203,9 @@ jobs:
         shell: bash
         env:
           ENVIRONMENT: dev
-          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY_USERNAME: ${{ github.actor }}
-          REGISTRY_OWNER: ${{ needs.build.outputs.reg_owner }}
+          CHART_PASSWORD: ${{ secrets.CHART_PASSWORD }}
+          CHART_USERNAME: ${{ github.actor }}
+          CHART_OWNER: ${{ needs.build.outputs.reg_owner }}
         run: make helm-push-registry ${{ matrix.module }}
 
       - name: Slack on error

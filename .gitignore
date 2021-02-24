@@ -27,3 +27,4 @@ helm/Chart.yaml
 helm/values.yaml
 /helm-vars
 metrics
+secrets

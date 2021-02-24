@@ -197,13 +197,13 @@ helm-concat: guard-ENVIRONMENT
 	cat $(MODULE)/helm-vars/values-$(ENVIRONMENT).yaml >> helm/values.yaml
 
 helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
-helm-push-registry: guard-ENVIRONMENT guard-CHART_REGISTRY guard-REGISTRY_OWNER
+helm-push-registry: guard-ENVIRONMENT guard-CHART_REGISTRY guard-CHART_OWNER
 	$(call check_module)
 	sed "s/imageRegistry:.*/imageRegistry: $(CHART_REGISTRY)/" -i helm/values.yaml
 	sed "s/version:.*/&-$(ENVIRONMENT)/" -i helm/values.yaml
 	cat helm/values.yaml
-	helm chart save helm $(CHART_REGISTRY)/$(REGISTRY_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
-	helm chart push $(CHART_REGISTRY)/$(REGISTRY_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
+	helm chart save helm $(CHART_REGISTRY)/$(CHART_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
+	helm chart push $(CHART_REGISTRY)/$(CHART_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
 
 
 helm-minikube-deploy:
@@ -216,17 +216,19 @@ registry-docker-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY gua
 	@echo $(REGISTRY_PASSWORD) | docker login $(CONTAINER_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
 
 registry-helm-push-login: export HELM_EXPERIMENTAL_OCI=1
-registry-helm-push-login: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME
-	@echo $(REGISTRY_PASSWORD) | helm registry login $(CHART_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
+registry-helm-push-login: guard-CHART_PASSWORD guard-CHART_REGISTRY guard-CHART_USERNAME
+	echo $(CHART_PASSWORD)
+	echo $(CHART_PASSWORD) | base64
+	@echo $(CHART_PASSWORD) | helm registry login $(CHART_REGISTRY) --username $(CHART_USERNAME) --password-stdin
 
-registry-list-charts: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
-	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/charts/"))'
+registry-list-charts: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-CHART_USERNAME guard-REPO_NAME
+	@curl -s -u $(CHART_USERNAME):$(CHART_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/charts/"))'
 
-registry-list-images: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
-	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/")  and (contains("/charts/") | not))'
+registry-list-images: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-CHART_USERNAME guard-REPO_NAME
+	@curl -s -u $(CHART_USERNAME):$(CHART_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/")  and (contains("/charts/") | not))'
 
-registry-repository-tags: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME guard-ENV_REPOSITORY
-	curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'
+registry-repository-tags: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-CHART_USERNAME guard-ENV_REPOSITORY
+	curl -s -u $(CHART_USERNAME):$(CHART_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'
 
 
 # Minikube commands
