@@ -18,6 +18,7 @@
 
 # The remote registry for Docker containers
 CONTAINER_REGISTRY := docker.pkg.github.com
+CHART_REGISTRY := ghcr.io
 
 # Helm version
 HELM_VERSION := v3.4.1
@@ -196,15 +197,14 @@ helm-concat: guard-ENVIRONMENT
 	cat $(MODULE)/helm-vars/values-$(ENVIRONMENT).yaml >> helm/values.yaml
 
 helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
-helm-push-registry: guard-ENVIRONMENT guard-CONTAINER_REGISTRY guard-REGISTRY_OWNER
+helm-push-registry: guard-ENVIRONMENT guard-CHART_REGISTRY guard-REGISTRY_OWNER
 	@$(call check_module)
-	sed "s/imageRegistry:.*/imageRegistry: $(CONTAINER_REGISTRY)/" -i helm/values.yaml
+	sed "s/imageRegistry:.*/imageRegistry: $(CHART_REGISTRY)/" -i helm/values.yaml
 	cat helm/Chart.yaml
 	cat helm/values.yaml
-	helm chart save helm $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):$(VERSION)
-	helm chart save helm $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):latest
-	helm chart push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):$(VERSION)
-	helm chart push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(REPO_NAME)/charts/$(ENVIRONMENT)/$(CHART_NAME):latest
+	helm chart save helm $(CHART_REGISTRY)/$(REGISTRY_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
+	helm chart push $(CHART_REGISTRY)/$(REGISTRY_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
+
 
 helm-minikube-deploy:
 	@$(call check_module)
@@ -216,17 +216,17 @@ registry-docker-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY gua
 	@echo $(REGISTRY_PASSWORD) | docker login $(CONTAINER_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
 
 registry-helm-push-login: export HELM_EXPERIMENTAL_OCI=1
-registry-helm-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME
-	@echo $(REGISTRY_PASSWORD) | helm registry login $(CONTAINER_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
+registry-helm-push-login: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME
+	@echo $(REGISTRY_PASSWORD) | helm registry login $(CHART_REGISTRY) --username $(REGISTRY_USERNAME) --password-stdin
 
-registry-list-charts: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
-	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/charts/"))'
+registry-list-charts: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
+	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/charts/"))'
 
-registry-list-images: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
-	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/")  and (contains("/charts/") | not))'
+registry-list-images: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME guard-REPO_NAME
+	@curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/_catalog?n=2000 | jq '.[] | .[] | select( startswith ("$(REPO_NAME)/")  and (contains("/charts/") | not))'
 
-registry-repository-tags: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY guard-REGISTRY_USERNAME guard-ENV_REPOSITORY
-	curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CONTAINER_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'
+registry-repository-tags: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-REGISTRY_USERNAME guard-ENV_REPOSITORY
+	curl -s -u $(REGISTRY_USERNAME):$(REGISTRY_PASSWORD) -X GET https://$(CHART_REGISTRY)/v2/$(ENV_REPOSITORY)/tags/list | jq '.[]'
 
 
 # Minikube commands
