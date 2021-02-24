@@ -198,9 +198,9 @@ helm-concat: guard-ENVIRONMENT
 
 helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
 helm-push-registry: guard-ENVIRONMENT guard-CHART_REGISTRY guard-REGISTRY_OWNER
-	@$(call check_module)
+	$(call check_module)
 	sed "s/imageRegistry:.*/imageRegistry: $(CHART_REGISTRY)/" -i helm/values.yaml
-	cat helm/Chart.yaml
+	sed "s/version:.*/&-$(ENVIRONMENT)/" -i helm/values.yaml
 	cat helm/values.yaml
 	helm chart save helm $(CHART_REGISTRY)/$(REGISTRY_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
 	helm chart push $(CHART_REGISTRY)/$(REGISTRY_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
