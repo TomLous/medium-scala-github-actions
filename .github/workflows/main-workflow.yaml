@@ -92,9 +92,7 @@ jobs:
         run: |
           make version
           echo ::set-output name=version::$(make version)
-          lc_owner=$(echo "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
-          echo $lc_owner
-          echo ::set-output name=reg_owner::$(lc_owner)
+          echo ::set-output name=reg_owner::$(echo "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
 
       - name: Show Output
         shell: bash
