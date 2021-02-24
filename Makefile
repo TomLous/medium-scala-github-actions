@@ -30,12 +30,14 @@ OUTPUT_PATH := ./output
 # Use Bash instead of sh
 SHELL := /bin/bash
 
+SBT_COMMAND := sbt --error 'set showSuccess := false' -Dsbt.log.noformat=true
+
 # Name of the team, often also name of the image namespace
-REPO_NAME = $(eval REPO_NAME := $$(shell sbt --error 'set showSuccess := false' showTeam))$(REPO_NAME)
+REPO_NAME = $(eval REPO_NAME := $$(shell $(SBT_COMMAND) showTeam))$(REPO_NAME)
 IMAGE_NAMESPACE = $(REPO_NAME)
 
 # The version of the current release
-VERSION = $(eval VERSION := $$(shell sbt --error 'set showSuccess := false' showVersion))$(VERSION)
+VERSION = $(eval VERSION := $$(shell $(SBT_COMMAND) showVersion))$(VERSION)
 
 # Allow to pass the module name as command line arg
 MODULE = $(shell arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}})
@@ -44,13 +46,13 @@ MODULE = $(shell arg="$(filter-out $@,$(MAKECMDGOALS))" && echo $${arg:-${1}})
 FEATURE = $(shell echo $(MODULE) | sed -e 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]' )
 
 # Available modules to build
-MODULES = $(eval MODULES :=  $$(shell sbt --error 'set showSuccess := false' listModules))$(MODULES) #Weird bug adding some escape char to all output
+MODULES = $(eval MODULES :=  $$(shell $(SBT_COMMAND) listModules))$(MODULES) #Weird bug adding some escape char to all output
 
 # Get the image namespace/repo
-IMAGE_NAME = $(eval IMAGE_NAME := $$(shell sbt --error 'set showSuccess := false' $(MODULE)/showImageName))$(IMAGE_NAME)
+IMAGE_NAME = $(eval IMAGE_NAME := $$(shell $(SBT_COMMAND) $(MODULE)/showImageName))$(IMAGE_NAME)
 
 # Get the chart name
-CHART_NAME = $(eval CHART_NAME := $$(shell sbt --error 'set showSuccess := false' $(MODULE)/showChartName))$(CHART_NAME)
+CHART_NAME = $(eval CHART_NAME := $$(shell $(SBT_COMMAND) $(MODULE)/showChartName))$(CHART_NAME)
 
 # Docker output
 DOCKER_IMAGE_INFO_FILE := $(OUTPUT_PATH)/image.sh
@@ -58,11 +60,14 @@ DOCKER_IMAGE_INFO_FILE := $(OUTPUT_PATH)/image.sh
 # Load optionally generated shell file (used by Github Actions)
 -include $(DOCKER_IMAGE_INFO_FILE)
 
+
+
 ####
 
 define check_module
 	@$(if $(MODULE), $(info Using module: $(MODULE)), $(error Module is not set in command (make [action] [module]). Use one of the following modules as argument: $(MODULES)))
 endef
+
 
 .PHONY: \
 list-modules list-modules-json test-coverage upload-codecov \
@@ -86,13 +91,13 @@ echo-modules:
 	@echo "'$(MODULES)'"
 
 lint:
-	sbt scalastyle
+	$(SBT_COMMAND) scalastyle
 
 test:
-	sbt test
+	$(SBT_COMMAND) test
 
 test-coverage:
-	sbt -DcacheToDisk=1 coverage test coverageReport coverageAggregate
+	$(SBT_COMMAND) -DcacheToDisk=1 coverage test coverageReport coverageAggregate
 
 version:
 	@echo $(VERSION)
@@ -129,13 +134,13 @@ create-feature-branch:
 
 # SBT Version bumping
 bump-snapshot:
-	sbt bumpSnapshot
+	$(SBT_COMMAND) bumpSnapshot
 
 bump-release:
-	sbt bumpRelease
+	$(SBT_COMMAND) bumpRelease
 
 bump-patch:
-	sbt bumpPatch
+	$(SBT_COMMAND) bumpPatch
 
 bump-snapshot-and-push: set-github-config bump-snapshot git-push
 bump-release-and-push: set-github-config bump-release git-push
@@ -143,7 +148,7 @@ bump-patch-and-push: set-github-config bump-patch git-push
 
 # Docker Commands
 docker-build:
-	$(call check_module) sbt $(MODULE)/docker
+	$(call check_module) $(SBT_COMMAND) $(MODULE)/docker
 
 docker-push-registry: guard-REGISTRY_OWNER
 	$(call check_module)
