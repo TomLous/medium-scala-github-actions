@@ -1,0 +1,19 @@
+environment: minikube
+serviceAccount: spark
+envVars:
+javaOptions: "-Dconfig.resource=application.minikube.conf -Dlog4j.configuration=log4j.debug.properties -DLogLevel=DEBUG -Dlog4j.debug"
+driver:
+  cores: 1
+  memory: "2g"
+executor:
+  instances: 2
+  cores: 1
+  memory: "1g"
+hadoopConf:
+sparkConf:
+hostNetwork: false
+imagePullPolicy: IfNotPresent
+userId: 0
+
+
+

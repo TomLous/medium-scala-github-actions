@@ -193,7 +193,7 @@ install-helm:
 
 helm-concat: guard-ENVIRONMENT
 	@$(call check_module)
-	cat $(MODULE)/helm-vars/values-workhorse-$(ENVIRONMENT).yaml >> helm/values.yaml
+	cat $(MODULE)/helm-vars/values-$(ENVIRONMENT).yaml >> helm/values.yaml
 
 helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
 helm-push-registry: guard-ENVIRONMENT guard-CONTAINER_REGISTRY guard-REGISTRY_OWNER

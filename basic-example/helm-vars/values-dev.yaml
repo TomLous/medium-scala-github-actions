@@ -1,0 +1,15 @@
+environment: dev
+serviceAccount: spark-operator-spark
+envVars:
+  DEBUG_SPARK_CONFIG: 6
+javaOptions: "-Dconfig.resource=application.dev.conf -DLogLevel=INFO"
+driver:
+  cores: 3
+  memory: "12g"
+executor:
+  instances: 3
+  cores: 4
+  memory: "12g"
+hostNetwork: false
+imagePullPolicy: IfNotPresent
+userId: 0

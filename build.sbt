@@ -4,9 +4,7 @@ import sbtdocker.Instructions
 /**
   * Dependency versions.
   * When able to commit to a Spark major version, remove the switch logic below
-  * TODO: change config to fixed version
   */
-val sparkMajorVersion = sys.props.getOrElse("sparkMajorVersion", default = "3").toInt
 
 val versions =
   Map(
@@ -28,14 +26,14 @@ val scalaBaseVersion = versions("scala").reverse.dropWhile(_ != '.').reverse.ini
   * Library definitions
   */
 val sparkLibs = Seq(
-  "org.apache.spark" %% "spark-core" % versions("spark") % "provided",
-  "org.apache.spark" %% "spark-sql" % versions("spark") % "provided"
+  "org.apache.spark" %% "spark-core" % versions("spark") % Provided,
+  "org.apache.spark" %% "spark-sql" % versions("spark") % Provided
 ).map(_.exclude("org.slf4j", "*"))
 
 val loggingLibs = Seq(
-  "org.slf4j" % "slf4j-api" % versions("slf4j") % "provided",
-  "org.slf4j" % "jul-to-slf4j" % versions("slf4j") % "provided",
-  "org.slf4j" % "slf4j-log4j12" % versions("slf4j") % "provided"
+  "org.slf4j" % "slf4j-api" % versions("slf4j") % Provided,
+  "org.slf4j" % "jul-to-slf4j" % versions("slf4j") % Provided,
+  "org.slf4j" % "slf4j-log4j12" % versions("slf4j") % Provided
 )
 
 val configLibs = Seq(
@@ -67,7 +65,7 @@ val otherOverrides = Seq(
 
 /**
   * Optional list of dependencies to be packed with Docker
-  * For example: Postgress libaries should be bundled with the docker to be loaded before Spark
+  * For example: Postgres libaries should be bundled with the docker to be loaded before Spark
   */
 val externalDependencies = Seq.empty[ModuleID]
 
@@ -168,7 +166,7 @@ lazy val assemblySettings = Seq(
 )
 
 lazy val runLocalSettings = Seq(
-  // Include "provided" dependencies back to default run task
+  // Include Provided dependencies back to default run task
   // https://stackoverflow.com/questions/18838944/how-to-add-provided-dependencies-back-to-run-test-tasks-classpath/21803413#21803413
   Compile / run := Defaults
     .runTask(
@@ -215,26 +213,6 @@ lazy val dockerSettings = Seq(
   }
 )
 
-/**
-  * Project definition
-  * Here you can define all your modules. Best practice is still to create 1 even if you don't plan on more then one
-  * [module-name]\
-  *         helm-vars\
-  *              values-[env].yaml
-  *         src\
-  *           main\
-  *               resources\
-  *                  application.[env].conf
-  *                  log4j.properties
-  *                scala\
-  *                   xyz.graphiq.... [code]
-  *           test\
-  *               resources\
-  *                  application.[env].conf
-  *                  log4j.properties
-  *                scala\
-  *                   xyz.graphiq.... [ test code]
-  */
 lazy val util = (project in file("util"))
   .settings(
     commonSettings,
