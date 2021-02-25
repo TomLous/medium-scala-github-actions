@@ -164,10 +164,10 @@ jobs:
 
       - name: Container Registry Login
         shell: bash
-        run: make registry-docker-push-login
         env:
           REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           REGISTRY_USERNAME: ${{ github.actor }}
+        run: make registry-docker-push-login
 
       - name: Dockerize
         shell: bash
@@ -176,11 +176,8 @@ jobs:
       - name: Publish Docker Image to Github Container Registry
         shell: bash
         env:
-          MODULE: ${{ matrix.module }}
-          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_OWNER: ${{ needs.build.outputs.reg_owner }}
-        run: make docker-push-registry $MODULE
+        run: make docker-push-registry ${{ matrix.module }}
 
       - name: Install Helm
         shell: bash
@@ -190,7 +187,7 @@ jobs:
         shell: bash
         run: make registry-helm-push-login
         env:
-          CHART_PASSWORD: ${{ secrets.CHART_PASSWORD }}
+          CHART_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
           CHART_USERNAME: ${{ github.actor }}
 
       - name: Append Environmental Values to Chart Values
@@ -203,8 +200,6 @@ jobs:
         shell: bash
         env:
           ENVIRONMENT: dev
-          CHART_PASSWORD: ${{ secrets.CHART_PASSWORD }}
-          CHART_USERNAME: ${{ github.actor }}
           CHART_OWNER: ${{ needs.build.outputs.reg_owner }}
         run: make helm-push-registry ${{ matrix.module }}
 

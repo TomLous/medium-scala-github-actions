@@ -264,7 +264,7 @@ def createProjectModule(
         }
       },
       getChartName := {
-        s"$repo-$moduleName"
+        s"$repo/$moduleName"
       },
       getArtifactName := {
         s"$repo-$moduleName.jar"

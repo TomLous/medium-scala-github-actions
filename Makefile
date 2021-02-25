@@ -5,6 +5,7 @@
 # REGISTRY_USERNAME & REGISTRY_PASSWORD credentials for Github Container Registry for pushing & pulling images
 # SLACK_WEBHOOK_URL for slack integration
 
+
 #########################################
 
 # Note:
@@ -21,7 +22,7 @@ CONTAINER_REGISTRY := docker.pkg.github.com
 CHART_REGISTRY := ghcr.io
 
 # Helm version
-HELM_VERSION := v3.4.1
+HELM_VERSION := v3.5.2
 
 # The path where artifacts are created
 OUTPUT_PATH := ./output
@@ -55,13 +56,6 @@ IMAGE_NAME = $(eval IMAGE_NAME := $$(shell $(SBT_COMMAND) $(MODULE)/showImageNam
 # Get the chart name
 CHART_NAME = $(eval CHART_NAME := $$(shell $(SBT_COMMAND) $(MODULE)/showChartName))$(CHART_NAME)
 
-# Docker output
-DOCKER_IMAGE_INFO_FILE := $(OUTPUT_PATH)/image.sh
-
-# Load optionally generated shell file (used by Github Actions)
--include $(DOCKER_IMAGE_INFO_FILE)
-
-
 
 ####
 
@@ -87,9 +81,6 @@ list-modules:
 
 list-modules-json:
 	@echo $(MODULES) |  jq -R -c 'split(" ")'
-
-echo-modules:
-	@echo "'$(MODULES)'"
 
 lint:
 	$(SBT_COMMAND) scalastyle
@@ -132,7 +123,6 @@ create-feature-branch:
 	git checkout -b feature/$(FEATURE)
 
 
-
 # SBT Version bumping
 bump-snapshot:
 	$(SBT_COMMAND) bumpSnapshot
@@ -149,14 +139,15 @@ bump-patch-and-push: set-github-config bump-patch git-push
 
 # Docker Commands
 docker-build:
-	$(call check_module) $(SBT_COMMAND) $(MODULE)/docker
+	@$(call check_module)
+	$(SBT_COMMAND) $(MODULE)/docker
 
 docker-push-registry: guard-REGISTRY_OWNER
-	$(call check_module)
+	@$(call check_module)
 	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):$(VERSION)
 	@docker tag $(IMAGE_NAME):$(VERSION) $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):latest
-	docker push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):$(VERSION)
-	docker push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):latest
+	@docker push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):$(VERSION)
+	@docker push $(CONTAINER_REGISTRY)/$(REGISTRY_OWNER)/$(IMAGE_NAME):latest
 
 docker-image-clean:
 	@$(call check_module)
@@ -189,7 +180,6 @@ docker-push-minikube:
 
 # Helm commands
 install-helm:
-	curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 	curl -L https://git.io/get_helm.sh | bash -s -- --version $(HELM_VERSION)
 
 helm-concat: guard-ENVIRONMENT
@@ -198,12 +188,14 @@ helm-concat: guard-ENVIRONMENT
 
 helm-push-registry: export HELM_EXPERIMENTAL_OCI=1
 helm-push-registry: guard-ENVIRONMENT guard-CHART_REGISTRY guard-CHART_OWNER
-	$(call check_module)
+	@$(call check_module)
 	sed "s/imageRegistry:.*/imageRegistry: $(CHART_REGISTRY)/" -i helm/values.yaml
 	sed "s/version:.*/&-$(ENVIRONMENT)/" -i helm/values.yaml
 	cat helm/values.yaml
 	helm chart save helm $(CHART_REGISTRY)/$(CHART_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
-	helm chart push $(CHART_REGISTRY)/$(CHART_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
+	echo  "# helm chart push $(CHART_REGISTRY)/$(CHART_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)"
+	echo "Waiting for https://github.com/github/roadmap/issues/120"
+	#helm chart push $(CHART_REGISTRY)/$(CHART_OWNER)/$(CHART_NAME):$(VERSION)-$(ENVIRONMENT)
 
 
 helm-minikube-deploy:
@@ -217,8 +209,6 @@ registry-docker-push-login: guard-REGISTRY_PASSWORD guard-CONTAINER_REGISTRY gua
 
 registry-helm-push-login: export HELM_EXPERIMENTAL_OCI=1
 registry-helm-push-login: guard-CHART_PASSWORD guard-CHART_REGISTRY guard-CHART_USERNAME
-	echo $(CHART_PASSWORD)
-	echo $(CHART_PASSWORD) | base64
 	@echo $(CHART_PASSWORD) | helm registry login $(CHART_REGISTRY) --username $(CHART_USERNAME) --password-stdin
 
 registry-list-charts: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-CHART_USERNAME guard-REPO_NAME
@@ -233,31 +223,32 @@ registry-repository-tags: guard-REGISTRY_PASSWORD guard-CHART_REGISTRY guard-CHA
 
 # Minikube commands
 minikube-setup:
-	minikube start --driver=hyperkit --bootstrapper=kubeadm --cpus 4 --memory 8192 --insecure-registry=192.168.0.0/16
+	minikube start --driver=hyperkit --bootstrapper=kubeadm --cpus 4 --memory 8192 --insecure-registry=192.168.0.0/16 --kubernetes-version=v1.15.7
+	minikube addons enable metrics-server
 	minikube addons enable registry
 	minikube addons enable dashboard
 	@eval $$(minikube docker-env -u); \
+	docker rm -f minikube_registry_link || true; \
 	docker run -d --rm -it --name=minikube_registry_link --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:$$(minikube ip):5000"
 	kubectx minikube
 	-helm plugin install https://github.com/chartmuseum/helm-push
 	@eval $$(minikube docker-env); \
-	docker run -d --name chartmuseum --restart=always -p 8080:8080 -e DEBUG=true -e STORAGE=local -e STORAGE_LOCAL_ROOTDIR=/home/chartmuseum/charts chartmuseum/chartmuseum:v0.12.0
+	docker run -d --name chartmuseum --restart=always -p 8888:8080 -e DEBUG=true -e STORAGE=local -e STORAGE_LOCAL_ROOTDIR=/home/chartmuseum/charts chartmuseum/chartmuseum
 	kubectl create namespace spark-operator
 	kubectl create namespace spark-apps
 	kubectl create serviceaccount spark --namespace=spark-apps
 	kubectl create clusterrolebinding spark-operator-role --clusterrole=edit --serviceaccount=spark-apps:spark --namespace=spark-apps
 	kubectl config set-context --current --namespace=spark-apps
-	helm repo add incubator http://storage.googleapis.com/kubernetes-charts-incubator
- 	helm repo add incubator https://charts.helm.sh/incubator
+	helm repo add spark-operator https://googlecloudplatform.github.io/spark-on-k8s-operator --force-update
+	helm repo add chartmuseum http://$$(minikube ip):8888 --force-update
 	helm repo update
-	helm install spark incubator/sparkoperator --namespace spark-operator --set enableWebhook=true,sparkJobNamespace=spark-apps,logLevel=3 --skip-crds
-	helm repo add chartmuseum http://$$(minikube ip):8080
+	helm install spark spark-operator/spark-operator --namespace spark-operator --set webhook.enable=true,sparkJobNamespace=spark-apps,logLevel=2
 	@echo "Check Cluster"
 	kubectl cluster-info
 	@echo "Check Registry"
 	curl -s $$(minikube ip):5000/v2/_catalog | jq
 	@echo "Check Chart Museum"
-	curl $$(minikube ip):8080/index.yaml
+	curl $$(minikube ip):8888/index.yaml
 	@echo "Check Spark Operator"
 	kubectl get all -n spark-operator
 	helm list -n spark-operator
@@ -277,9 +268,8 @@ minikube-add-secret:
 	@$(call check_module)
 	$(info Transforming secrets in $(MODULE)/helm-vars/secrets into minikube-$(MODULE).secret)
 	@kubectl delete secret minikube-$(MODULE).secret -n spark-apps || true;
-	@CMD="kubectl create secret generic minikube-$(MODULE).secret  -n spark-apps "; while read secret; do CMD="$$CMD --from-literal=$${secret%:*}=$${secret#*:}"; done < $(MODULE)/helm-vars/secrets; $$CMD
+	@CMD="kubectl create secret generic minikube-$(MODULE).secret  -n spark-apps "; while read secret; do CMD="$$CMD --from-literal=$${secret%%:*}=$${secret#*:}"; done < $(MODULE)/helm-vars/secrets; $$CMD
 	@kubectl get secret minikube-$(MODULE).secret  -n spark-apps -o yaml
-
 
 # Guard to check ENV vars
 guard-%:
