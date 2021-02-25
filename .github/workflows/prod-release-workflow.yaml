@@ -9,8 +9,9 @@ jobs:
     name: Release to Prod
     runs-on: ubuntu-latest
     outputs:
-      modules: ${{ steps.project.outputs.modules }}
+      modules: ${{ steps.vars.outputs.modules }}
       version: ${{ steps.vars.outputs.version }}
+      reg_owner: ${{ steps.vars.outputs.reg_owner }}
 
     # If merged & pr was tagged release & from a release branch
     if: contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.merged == true && (github.event.pull_request.head.ref == 'release' || github.event.pull_request.head.ref == 'hotfix')
@@ -39,12 +40,14 @@ jobs:
 
       - name: Set variables
         id: vars
-        run: echo ::set-output name=version::$(make version)
+        env:
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+        run: |
+          make version
+          echo ::set-output name=version::$(make version)
+          echo ::set-output name=reg_owner::$(echo "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo ::set-output name=modules::$(make list-modules-json)
 
-      - name: Set Project Modules for matrix
-        id: project
-        shell: bash
-        run: echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Slack on error
         uses: 8398a7/action-slack@v3
@@ -100,7 +103,7 @@ jobs:
       - name: Publish Docker Image to Github Container Registry
         shell: bash
         env:
-          REGISTRY_OWNER: ${{ needs.build.outputs.reg_owner }}
+          REGISTRY_OWNER: ${{ needs.prepare-release.outputs.reg_owner }}
         run: make docker-push-registry ${{ matrix.module }}
 
       - name: Install Helm
@@ -124,7 +127,7 @@ jobs:
         shell: bash
         env:
           ENVIRONMENT: prod
-          CHART_OWNER: ${{ needs.build.outputs.reg_owner }}
+          CHART_OWNER: ${{ needs.prepare-release.outputs.reg_owner }}
         run: make helm-push-registry ${{ matrix.module }}
 
       - name: Slack on error

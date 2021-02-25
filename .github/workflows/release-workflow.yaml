@@ -9,8 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       branch: ${{ steps.type.outputs.branch }}
-      modules: ${{ steps.project.outputs.modules }}
+      modules: ${{ steps.vars.outputs.modules }}
       version: ${{ steps.vars.outputs.version }}
+      reg_owner:  ${{ steps.vars.outputs.reg_owner }}
       pr_url: ${{ steps.pr.outputs.pr_url }}
 
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/hotfix'
@@ -42,7 +43,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          branch: 'release'
+          branch: release
 
       - name: Check out repository code
         uses: actions/checkout@v2
@@ -73,12 +74,13 @@ jobs:
 
       - name: Set variables
         id: vars
-        run: echo ::set-output name=version::$(make version)
-
-      - name: Set Project Modules for matrix
-        id: project
-        shell: bash
-        run: echo ::set-output name=modules::$(make list-modules-json)
+        env:
+          REGISTRY_OWNER: ${{ github.repository_owner }}
+        run: |
+          make version
+          echo ::set-output name=version::$(make version)
+          echo ::set-output name=reg_owner::$(echo "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Find old PR
         uses: juliangruber/find-pull-request-action@v1
@@ -112,7 +114,7 @@ jobs:
       - name: Show Output
         shell: bash
         run: |
-          echo "modules: ${{ steps.project.outputs.modules }}"
+          echo "modules: ${{ steps.vars.outputs.modules }}"
           echo "version: ${{ steps.vars.outputs.version }}"
           echo "pr_url: ${{ steps.pr.outputs.pr_url }}"
 
@@ -169,7 +171,7 @@ jobs:
       - name: Publish Docker Image to Github Container Registry
         shell: bash
         env:
-          REGISTRY_OWNER: ${{ needs.build.outputs.reg_owner }}
+          REGISTRY_OWNER: ${{ needs.prepare-release.outputs.reg_owner }}
         run: make docker-push-registry ${{ matrix.module }}
 
       - name: Install Helm
@@ -186,14 +188,14 @@ jobs:
       - name: Append Environmental Values to Chart Values
         shell: bash
         env:
-          ENVIRONMENT: staging
+          ENVIRONMENT: test
         run: make helm-concat ${{ matrix.module }}
 
       - name: Push Charts to Github Helm Repo
         shell: bash
         env:
-          ENVIRONMENT: staging
-          CHART_OWNER: ${{ needs.build.outputs.reg_owner }}
+          ENVIRONMENT: test
+          CHART_OWNER: ${{ needs.prepare-release.outputs.reg_owner }}
         run: make helm-push-registry ${{ matrix.module }}
 
       - name: Slack on error
@@ -226,5 +228,5 @@ jobs:
           icon_emoji: ':github:'
           status: ${{ job.status }}
           fields:
-          text: ":rocket: ${{ github.event.repository.name }} *v${{ needs.prepare-release.outputs.version }}* deployed to *STAGING*\n\n:arrow_right: <${{ needs.prepare-release.outputs.pr_url}}|Release To PROD>"
+          text: ":rocket: ${{ github.event.repository.name }} *v${{ needs.prepare-release.outputs.version }}* deployed to *TEST*\n\n:arrow_right: <${{ needs.prepare-release.outputs.pr_url}}|Release To PROD>"
 

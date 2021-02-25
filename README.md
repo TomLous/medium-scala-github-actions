@@ -60,7 +60,7 @@ Every push to remote `feature/[name]` branch will trigger linters & testers
 When merged with `main` a new SNAPSHOT release will be automatically deployed to DEV (eg. image & chart)
 
 To start a release use the manual github action to start releasing the current version on the HEAD of `main`
-This will create & deploy the image to STAGING & DEV with the new semantic release version `vX.Y.Z` and a PR back to main
+This will create & deploy the image to TEST & DEV with the new semantic release version `vX.Y.Z` and a PR back to main
 
 Merging the PR form `release` to `main` will trigger the push to PROD of this release version `vX.Y.Z`
 

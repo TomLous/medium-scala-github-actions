@@ -40,7 +40,7 @@ jobs:
     needs: check
     if: needs.check.outputs.num_changes > 0
     outputs:
-      modules: ${{ steps.project.outputs.modules }}
+      modules: ${{ steps.vars.outputs.modules }}
       version: ${{ steps.vars.outputs.version }}
       reg_owner:  ${{ steps.vars.outputs.reg_owner }}
 
@@ -75,10 +75,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: target
 
-      - name: Set Project Modules for matrix
-        id: project
-        shell: bash
-        run: echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Bump snapshot (main)
         if: github.ref == 'refs/heads/main'
@@ -93,11 +89,12 @@ jobs:
           make version
           echo ::set-output name=version::$(make version)
           echo ::set-output name=reg_owner::$(echo "$REGISTRY_OWNER" | tr '[:upper:]' '[:lower:]')
+          echo ::set-output name=modules::$(make list-modules-json)
 
       - name: Show Output
         shell: bash
         run: |
-          echo "modules: ${{ steps.project.outputs.modules }}"
+          echo "modules: ${{ steps.vars.outputs.modules }}"
           echo "version: ${{ steps.vars.outputs.version }}"
           echo "num_changes: ${{ needs.check.outputs.num_changes }}"
           echo "reg_owner: ${{ steps.vars.outputs.reg_owner }}"
