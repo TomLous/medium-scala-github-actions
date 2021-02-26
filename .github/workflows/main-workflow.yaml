@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - 'feature/**'
-      - 'hotfix'
       - 'main'
+      - 'hotfix'
+
 
 jobs:
   check:
@@ -130,7 +131,7 @@ jobs:
           icon_emoji: ':github:'
           status: ${{ job.status }}
           fields:
-          text: ":eight_pointed_black_star: ${{ github.event.repository.name }} *hotfix* ready for release\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions?query=workflow%3Arelease|Start Release Workflow ( hotfix ) >"
+          text: ":eight_pointed_black_star: ${{ github.event.repository.name }} *hotfix* ready for release\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/workflows/release-workflow.yaml|Start Release Workflow ( hotfix ) >"
 
   deploy:
     if: github.ref == 'refs/heads/main'
