@@ -1,7 +1,7 @@
 environment: prod
 serviceAccount: spark-operator-spark
 envVars:
-  DEBUG_SPARK_CONFIG: 6
+  DEBUG_SPARK_CONFIG: 0
 javaOptions: "-Dconfig.resource=application.prod.conf -DLogLevel=WARN"
 driver:
   cores: 3
