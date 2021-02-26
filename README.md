@@ -200,3 +200,4 @@ Needs `CONTAINER_REGISTRY` (from Makefile), `ENVIRONMENT` and `HELM_EXPERIMENTAL
 Saves the charts and pushes them to the chart repo in `CONTAINER_REGISTRY` using `[CONTAINER_REGISTRY]/[team]/charts/[ENVIRONMENT]/[chart name from module]:latest` and `[CONTAINER_REGISTRY]/[team]/charts/[ENVIRONMENT]/[chart name from module]:[version]`
 
 
+Hotfix test
