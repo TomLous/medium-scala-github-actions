@@ -69,7 +69,7 @@ jobs:
     needs: prepare-release
     strategy:
       matrix:
-        modules: ${{fromJson(needs.prepare-release.outputs.modules)}}
+        module: ${{fromJson(needs.prepare-release.outputs.modules)}}
 
     steps:
       - name: Check out repository code
@@ -155,8 +155,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{  needs.prepare-release.outputs.version }}
-          release_name: Release ${{  needs.prepare-release.outputs.version }}
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+          release_name: Release ${{ needs.prepare-release.outputs.version }}
           draft: false
           prerelease: false
 

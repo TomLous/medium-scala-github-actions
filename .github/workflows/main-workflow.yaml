@@ -229,5 +229,5 @@ jobs:
           icon_emoji: ':github:'
           status: ${{ job.status }}
           fields:
-          text: ":rocket: ${{ github.event.repository.name }} *v${{ needs.build.outputs.version }}* deployed to *DEV*\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions?query=workflow%3A\"Manual%3A+Start+Release\"|Start Release Workflow (main)>"
+          text: ":rocket: ${{ github.event.repository.name }} *v${{ needs.build.outputs.version }}* deployed to *DEV*\n\n:arrow_right: <https://github.com/${{ github.repository }}/actions/workflows/release-workflow.yaml|Start Release Workflow (main)>"
 
